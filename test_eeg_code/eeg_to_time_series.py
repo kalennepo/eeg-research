@@ -3,13 +3,19 @@ EEG Time Series Starter Code
 Uses the ALAS Muse recording to produce band-power time series.
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import signal
 
 # ---- Load data ----
-df = pd.read_csv("ALAS_Recording01_P01_Dyad01_Task01.csv")
+# Resolve path relative to project root so it works from any CWD
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root = os.path.dirname(_script_dir)
+_csv_path = os.path.join(_project_root, "TestEEGData", "Dyad01", "P01", "ALAS_Recording01_P01_Dyad01_Task01.csv")
+df = pd.read_csv(_csv_path)
 df = df[df["Time"] != "Time"].apply(pd.to_numeric)  # file has duplicate header rows, remove them
 
 # Columns: Time (unix timestamp), MV1-MV4
