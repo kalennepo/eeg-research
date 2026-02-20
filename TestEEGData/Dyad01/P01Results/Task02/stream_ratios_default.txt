@@ -1,0 +1,70 @@
+Pipeline state: default (auto, quality check on)
+Input: C:\EEgProject\eeg-research\TestEEGData\Dyad01\P01\ALAS_Recording01_P01_Dyad01_Task02.csv
+Output dir: C:\EEgProject\eeg-research\TestEEGData\Dyad01\P01Results\Task02
+
+Streaming-style ratios (every 1 s):
+  t=1.0s  Beta/Alpha = 0.35, Theta/Beta = 7.86
+  t=2.0s  Beta/Alpha = 0.10, Theta/Beta = 10.37
+  t=3.0s  Beta/Alpha = 0.12, Theta/Beta = 17.41
+  t=4.0s  Beta/Alpha = 0.45, Theta/Beta = 16.08
+  t=5.0s  Beta/Alpha = 0.06, Theta/Beta = 12.26
+  t=6.0s  Beta/Alpha = 0.27, Theta/Beta = 8.78
+  t=7.0s  Beta/Alpha = 0.17, Theta/Beta = 15.63
+  t=8.0s  Beta/Alpha = 0.16, Theta/Beta = 5.74
+  t=9.0s  Beta/Alpha = 0.10, Theta/Beta = 9.58
+  t=10.0s  Beta/Alpha = 0.08, Theta/Beta = 16.53
+  t=11.0s  Beta/Alpha = 0.35, Theta/Beta = 9.46
+  t=12.0s  Beta/Alpha = 0.24, Theta/Beta = 1.57
+  t=13.0s  Beta/Alpha = 0.14, Theta/Beta = 3.02
+  t=14.0s  Beta/Alpha = 0.03, Theta/Beta = 4.57
+  t=15.0s  Beta/Alpha = 0.11, Theta/Beta = 14.30
+  t=16.0s  Beta/Alpha = 0.08, Theta/Beta = 11.06
+  t=17.0s  Beta/Alpha = 0.07, Theta/Beta = 12.69
+  t=18.0s  Beta/Alpha = 0.04, Theta/Beta = 11.14
+  t=19.0s  Beta/Alpha = 0.07, Theta/Beta = 12.90
+  t=20.0s  Beta/Alpha = 0.07, Theta/Beta = 12.96
+  t=21.0s  Beta/Alpha = 0.16, Theta/Beta = 14.55
+  t=22.0s  Beta/Alpha = 0.22, Theta/Beta = 6.61
+  t=23.0s  Beta/Alpha = 0.07, Theta/Beta = 8.50
+  t=24.0s  Beta/Alpha = 0.14, Theta/Beta = 12.46
+  t=25.0s  Beta/Alpha = 0.13, Theta/Beta = 11.45
+  t=26.0s  Beta/Alpha = 0.11, Theta/Beta = 17.58
+  t=27.0s  Beta/Alpha = 0.06, Theta/Beta = 10.39
+  t=28.0s  Beta/Alpha = 0.53, Theta/Beta = 10.06
+  t=29.0s  Beta/Alpha = 0.20, Theta/Beta = 4.81
+  t=30.0s  Beta/Alpha = 0.05, Theta/Beta = 16.03
+  t=31.0s  Beta/Alpha = 0.13, Theta/Beta = 9.12
+  t=32.0s  Beta/Alpha = 0.25, Theta/Beta = 11.16
+  t=33.0s  Beta/Alpha = 0.08, Theta/Beta = 9.02
+  t=34.0s  Beta/Alpha = 0.13, Theta/Beta = 5.81
+  t=35.0s  Beta/Alpha = 0.04, Theta/Beta = 15.43
+  t=36.0s  Beta/Alpha = 0.10, Theta/Beta = 14.42
+  t=37.0s  Beta/Alpha = 0.26, Theta/Beta = 5.59
+  t=38.0s  Beta/Alpha = 0.11, Theta/Beta = 11.47
+  t=39.0s  Beta/Alpha = 0.29, Theta/Beta = 17.81
+  t=40.0s  Beta/Alpha = 0.11, Theta/Beta = 10.77
+  t=41.0s  Beta/Alpha = 0.24, Theta/Beta = 10.72
+  t=42.0s  Beta/Alpha = 0.17, Theta/Beta = 7.05
+  t=43.0s  Beta/Alpha = 0.06, Theta/Beta = 15.08
+  t=44.0s  Beta/Alpha = 0.20, Theta/Beta = 7.11
+  t=45.0s  Beta/Alpha = 0.05, Theta/Beta = 4.56
+  t=46.0s  Beta/Alpha = 0.17, Theta/Beta = 13.25
+  t=47.0s  Beta/Alpha = 0.10, Theta/Beta = 7.14
+  t=48.0s  Beta/Alpha = 0.10, Theta/Beta = 20.60
+  t=49.0s  Beta/Alpha = 0.23, Theta/Beta = 2.47
+  t=50.0s  Beta/Alpha = 0.26, Theta/Beta = 9.74
+  t=51.0s  Beta/Alpha = 0.18, Theta/Beta = 11.11
+  t=52.0s  Beta/Alpha = 0.10, Theta/Beta = 13.03
+  t=53.0s  Beta/Alpha = 0.11, Theta/Beta = 12.60
+  t=54.0s  Beta/Alpha = 0.08, Theta/Beta = 8.34
+  t=55.0s  Beta/Alpha = 0.07, Theta/Beta = 13.95
+  t=56.0s  Beta/Alpha = 0.19, Theta/Beta = 6.93
+  t=57.0s  Beta/Alpha = 0.25, Theta/Beta = 2.22
+  t=58.0s  Beta/Alpha = 0.22, Theta/Beta = 10.29
+  t=59.0s  Beta/Alpha = 0.07, Theta/Beta = 7.96
+  t=60.0s  Beta/Alpha = 0.08, Theta/Beta = 14.13
+  t=61.0s  Beta/Alpha = 0.16, Theta/Beta = 14.63
+  t=62.0s  Beta/Alpha = 0.15, Theta/Beta = 14.11
+
+Beta/Alpha ratio: mean=0.15, std=0.10, last=0.15
+Theta/Beta ratio: mean=10.71, std=4.25, last=14.11
