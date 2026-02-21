@@ -1,6 +1,9 @@
 Pipeline state: no quality check (auto ref, no check)
 Input: C:\EEgProject\eeg-research\TestEEGData\Dyad01\P01\ALAS_Recording01_P01_Dyad01_Task02.csv
 Output dir: C:\EEgProject\eeg-research\TestEEGData\Dyad01\P01Results\Task02
+  MV1: var=6.9 uV^2, pp=10.3 uV
+  MV3: var=6.7 uV^2, pp=9.9 uV
+Re-referencing: applied
 
 Streaming-style ratios (every 1 s):
   t=1.0s  Beta/Alpha = 0.35, Theta/Beta = 7.86

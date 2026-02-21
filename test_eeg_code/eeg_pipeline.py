@@ -38,6 +38,33 @@ PIPELINE_STATE_LABELS = {
 }
 
 
+def format_reference_report(quality_info, actual_referenced):
+    """
+    Build lines for reference channel stats (uV^2, uV) and re-referencing status.
+    Returns list of strings for console or text file.
+    """
+    lines = []
+    if not quality_info:
+        return lines
+    for ch in ("MV1", "MV3"):
+        info = quality_info.get(ch, {})
+        var = info.get("var")
+        pp = info.get("pp")
+        if var is not None and pp is not None:
+            lines.append(f"  {ch}: var={var:.1f} uV^2, pp={pp:.1f} uV")
+    if actual_referenced:
+        lines.append("Re-referencing: applied")
+    else:
+        reasons = []
+        for ch in ("MV1", "MV3"):
+            info = quality_info.get(ch, {})
+            if not info.get("good", True):
+                reasons.append(f"{ch}: {info.get('reason', '?')}")
+        reason_str = "; ".join(reasons) if reasons else "quality check"
+        lines.append(f"Re-referencing: skipped ({reason_str})")
+    return lines
+
+
 def get_project_root():
     """Project root (parent of test_eeg_code)."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -93,28 +120,30 @@ def check_reference_quality(mv_ref, mv_meas, variance_threshold=REF_VARIANCE_THR
                             amplitude_threshold=REF_AMPLITUDE_THRESHOLD, snr_threshold=REF_SNR_THRESHOLD):
     """
     Check if reference channels (MV1/MV3) are suitable for re-referencing.
-    
-    Returns: (is_good, reason)
+
+    Returns: (is_good, reason, ref_var, ref_pp)
         is_good: True if reference is clean enough to use
         reason: string explaining why it passed/failed
+        ref_var: reference variance (uV^2)
+        ref_pp: reference peak-to-peak amplitude (uV)
     """
     ref_var = np.var(mv_ref)
     ref_pp = np.ptp(mv_ref)  # peak-to-peak amplitude
     meas_var = np.var(mv_meas)
-    
+
     # Check variance threshold
     if ref_var > variance_threshold:
-        return False, f"reference variance too high ({ref_var:.1f} > {variance_threshold:.1f} uV²)"
-    
+        return False, f"reference variance too high ({ref_var:.1f} > {variance_threshold:.1f} uV^2)", ref_var, ref_pp
+
     # Check amplitude threshold
     if ref_pp > amplitude_threshold:
-        return False, f"reference amplitude too high ({ref_pp:.1f} > {amplitude_threshold:.1f} uV)"
-    
+        return False, f"reference amplitude too high ({ref_pp:.1f} > {amplitude_threshold:.1f} uV)", ref_var, ref_pp
+
     # Check SNR: if reference is much noisier than measurement, skip
     if meas_var > 0 and ref_var / meas_var > snr_threshold:
-        return False, f"reference too noisy relative to measurement (SNR ratio {ref_var/meas_var:.3f} > {snr_threshold:.3f})"
-    
-    return True, f"reference quality OK (var={ref_var:.1f} uV², pp={ref_pp:.1f} uV)"
+        return False, f"reference too noisy relative to measurement (SNR ratio {ref_var/meas_var:.3f} > {snr_threshold:.3f})", ref_var, ref_pp
+
+    return True, f"reference quality OK (var={ref_var:.1f} uV^2, pp={ref_pp:.1f} uV)", ref_var, ref_pp
 
 
 def load_and_prepare(csv_path=None, referenced=True, auto_quality_check=True, verbose=True):
@@ -157,18 +186,17 @@ def load_and_prepare(csv_path=None, referenced=True, auto_quality_check=True, ve
     actual_referenced = False
     quality_info = {}
     
+    # Always compute reference stats (uV², uV) for reporting
+    ref1_good, ref1_reason, ref1_var, ref1_pp = check_reference_quality(mv1, mv2)
+    ref2_good, ref2_reason, ref2_var, ref2_pp = check_reference_quality(mv3, mv4)
+    quality_info = {
+        'MV1': {'good': ref1_good, 'reason': ref1_reason, 'var': ref1_var, 'pp': ref1_pp},
+        'MV3': {'good': ref2_good, 'reason': ref2_reason, 'var': ref2_var, 'pp': ref2_pp}
+    }
+
     if referenced == 'auto':
         # Auto mode: check quality if enabled, otherwise default to re-referencing
         if auto_quality_check:
-            # Check quality of both reference pairs
-            ref1_good, ref1_reason = check_reference_quality(mv1, mv2)
-            ref2_good, ref2_reason = check_reference_quality(mv3, mv4)
-            
-            quality_info = {
-                'MV1': {'good': ref1_good, 'reason': ref1_reason},
-                'MV3': {'good': ref2_good, 'reason': ref2_reason}
-            }
-            
             # Only re-reference if both references are good
             if ref1_good and ref2_good:
                 actual_referenced = True
@@ -259,6 +287,8 @@ def run_batch(output_dir=None, csv_path=None, referenced=True, auto_quality_chec
     t_uniform, eeg1_filt, eeg2_filt, fs, actual_referenced, quality_info = load_and_prepare(
         csv_path=csv_path, referenced=referenced, auto_quality_check=auto_quality_check
     )
+    for line in format_reference_report(quality_info, actual_referenced):
+        print(line)
 
     # Band power time series from channel 1 (MV2); add channel 2 if you want
     band_df = compute_band_power_timeseries(eeg1_filt, fs=fs)
@@ -337,13 +367,18 @@ def run_streaming_style(csv_path=None, out_dir=None, referenced=True, auto_quali
         f"Pipeline state: {PIPELINE_STATE_LABELS.get(pipeline_state, pipeline_state)}",
         f"Input: {csv_path}",
         f"Output dir: {out_dir}",
-        "",
-        "Streaming-style ratios (every 1 s):",
     ]
 
     t_uniform, eeg1_filt, eeg2_filt, fs, actual_referenced, quality_info = load_and_prepare(
         csv_path=csv_path, referenced=referenced, auto_quality_check=auto_quality_check, verbose=False
     )
+    ref_lines = format_reference_report(quality_info, actual_referenced)
+    for line in ref_lines:
+        print(line)
+    lines.extend(ref_lines)
+    lines.append("")
+    lines.append("Streaming-style ratios (every 1 s):")
+
     band_df = compute_band_power_timeseries(eeg1_filt, fs=fs)
 
     for _, row in band_df.iterrows():

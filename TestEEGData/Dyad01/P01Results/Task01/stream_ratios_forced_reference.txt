@@ -1,6 +1,9 @@
 Pipeline state: forced reference (MV2-MV1, MV4-MV3)
 Input: C:\EEgProject\eeg-research\TestEEGData\Dyad01\P01\ALAS_Recording01_P01_Dyad01_Task01.csv
 Output dir: C:\EEgProject\eeg-research\TestEEGData\Dyad01\P01Results\Task01
+  MV1: var=4.3 uV^2, pp=7.7 uV
+  MV3: var=4.3 uV^2, pp=7.7 uV
+Re-referencing: applied
 
 Streaming-style ratios (every 1 s):
   t=1.0s  Beta/Alpha = 0.68, Theta/Beta = 4.41
