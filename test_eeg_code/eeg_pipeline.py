@@ -335,10 +335,11 @@ def run_batch(output_dir=None, csv_path=None, referenced=True, auto_quality_chec
                 a.axhline(y=1, color="gray", linestyle="--", alpha=0.7)
         else:
             ax.plot(band_df["time_sec"], band_df[name])
-            ax.set_ylabel(name)
+            ax.set_ylabel(f"{name}\n(µV²/Hz)")
     axes[-1].set_xlabel("Time (sec)")
     axes[0].set_title(f"Band Power and Ratios — {PIPELINE_STATE_LABELS.get(pipeline_state, pipeline_state)}")
     fig.tight_layout()
+    fig.subplots_adjust(left=0.12)  # Room for y-axis labels with units
     fig.savefig(os.path.join(output_dir, f"band_power{suffix}.png"), dpi=150)
     plt.close(fig)
 
