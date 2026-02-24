@@ -1,0 +1,236 @@
+================================================================================
+EEG PIPELINE OUTPUT GUIDE
+================================================================================
+This document explains all graphs, CSVs, and text files produced by the EEG
+pipeline, what each shows, and what can be deduced from them.
+
+================================================================================
+INPUT DATA
+================================================================================
+  The pipeline reads raw EEG from CSV files (ALAS Muse / similar recordings).
+
+  Format:
+    - Columns: Time, MV1, MV2, MV3, MV4
+    - Time: Unix timestamp (seconds) for each sample
+    - MV1, MV2, MV3, MV4: Voltage in microvolts (µV) for each channel
+    - Sampling: Variable in raw file; pipeline resamples to 250 Hz uniformly
+
+  Channel roles:
+    MV1, MV3  - Reference channels
+    MV2, MV4  - Active/measurement channels (scalp)
+
+  File naming: ALAS_Recording01_P01_Dyad01_TaskNN.csv (or similar)
+  Location: TestEEGData/Dyad01/P01/ (or P02/, etc.)
+
+================================================================================
+OUTPUT LOCATION
+================================================================================
+Outputs are saved in TestEEGData/Dyad01/P01Results/<TaskNN>/ (e.g. Task01,
+Task02, Task03, Task04). Each task folder contains the results for that
+recording. The pipeline state suffix (e.g. _default, _no_reference) indicates
+how the data was processed.
+
+================================================================================
+PIPELINE STATES (suffixes in filenames)
+================================================================================
+  _default           - Auto re-referencing with quality check (recommended)
+  _no_reference      - Raw MV2/MV4 only; no subtraction of reference channels
+  _forced_reference  - Always re-reference (MV2-MV1, MV4-MV3) regardless of
+                       reference quality
+  _no_quality_check  - Auto re-reference but skip quality checks
+
+================================================================================
+WHAT IS RE-REFERENCING?
+================================================================================
+
+  EEG measures voltage *between* two electrodes. The raw recording has four
+  channels: MV1, MV2, MV3, MV4. MV1 and MV3 are "reference" electrodes (often
+  placed at electrically quiet sites like mastoid or ear). MV2 and MV4 are the
+  "active" or measurement electrodes over scalp regions of interest.
+
+  RE-REFERENCING means subtracting the reference from the measurement:
+    EEG1 = MV2 - MV1
+    EEG2 = MV4 - MV3
+
+  WHY IT HELPS:
+    - Removes common noise: Both the reference and measurement pick up the same
+      environmental noise (power line, cable movement, body drift). Subtracting
+      the reference cancels out that shared component, leaving a cleaner signal
+      that better reflects brain activity at the measurement site.
+    - Reduces DC drift: Slow baseline shifts that affect both electrodes are
+      removed by the subtraction.
+    - Standard practice: Most EEG analysis uses a referenced signal rather than
+      raw single-electrode voltage.
+
+  WHEN IT'S SKIPPED (quality check):
+    If the reference channels (MV1, MV3) are noisy, contaminated, or have large
+    artifacts (e.g. movement, loose contact), subtracting them can *inject* that
+    noise into the derived EEG instead of removing it. The pipeline checks
+    reference quality (variance and peak-to-peak) and skips re-referencing when
+    the reference is too noisy. In that case, raw MV2 and MV4 are used instead.
+
+  WITHOUT RE-REFERENCING (no_reference mode):
+    The signal still contains common-mode noise and drift. It may be noisier
+    but avoids the risk of subtracting a bad reference. Use when references are
+    known to be unreliable.
+
+================================================================================
+1. BAND POWER GRAPH (band_power_<state>.png)
+================================================================================
+
+WHAT IT SHOWS:
+  A 7-panel figure with time on the x-axis (seconds) and the following panels:
+
+  Panel 1: Delta (1-4 Hz)     - Power in µV²/Hz over time
+  Panel 2: Theta (4-8 Hz)     - Power in µV²/Hz over time
+  Panel 3: Alpha (8-13 Hz)    - Power in µV²/Hz over time
+  Panel 4: Beta (13-30 Hz)   - Power in µV²/Hz over time
+  Panel 5: Gamma (30-50 Hz)  - Power in µV²/Hz over time
+  Panel 6: Beta/Alpha ratio  - Dimensionless ratio over time
+  Panel 7: Theta/Beta ratio  - Dimensionless ratio over time
+
+  Each band power is computed from EEG channel 1 (MV2, or MV2-MV1 when
+  re-referenced) using a 2-second sliding window with 1-second step (50%
+  overlap). Welch's method is used for the power spectral density.
+
+WHAT CAN BE DEDUCED:
+  - Band power panels: Which frequency bands dominate at each moment. For
+    example, high alpha during eyes-closed rest, or increased beta during
+    focused tasks.
+  - Beta/Alpha ratio: Engagement vs. relaxation. Higher = more focused/alert;
+    lower = more relaxed. The dashed line at 1.0 marks the crossover.
+  - Theta/Beta ratio: Alertness/attention. Higher = more drowsy or inattentive;
+    lower = more alert and engaged.
+  - Temporal patterns: How brain activity changes across the recording (e.g.,
+    transitions from rest to task, or fluctuations in attention).
+  - Artifacts: Sudden spikes or sustained elevations may indicate movement,
+    muscle activity, or electrode issues.
+
+================================================================================
+2. FILTERED EEG GRAPH (filtered_eeg_<state>.png)
+================================================================================
+
+WHAT IT SHOWS:
+  A time-series plot of the raw EEG signal after processing:
+  - Bandpass filtered 1-50 Hz (removes DC drift and high-frequency noise)
+  - Optionally re-referenced (EEG1 = MV2-MV1, EEG2 = MV4-MV3)
+  - Two channels: EEG 1 (from MV2) and EEG 2 (from MV4)
+  - A 5-second window (10-15 seconds into the recording) for visual clarity
+
+  Y-axis: Voltage in microvolts (µV)
+  X-axis: Time in seconds
+
+WHAT CAN BE DEDUCED:
+  - Signal quality: Clean EEG shows smooth, oscillatory waves. Large spikes,
+    flat lines, or very irregular patterns suggest artifacts (movement, loose
+    electrodes, muscle).
+  - Channel comparison: EEG 1 vs EEG 2 can reveal if one channel is noisier or
+    if both track similar activity.
+  - Dominant rhythms: Alpha (8-13 Hz) appears as ~10 waves per second;
+    theta (4-8 Hz) as slower waves. Visual inspection can confirm band-power
+    findings.
+
+================================================================================
+3. BAND POWER TIMESERIES CSV (band_power_timeseries_<state>.csv)
+================================================================================
+
+WHAT IT CONTAINS:
+  - First line: Comment with pipeline_state
+  - Columns: time_sec, Delta, Theta, Alpha, Beta, Gamma, beta_alpha_ratio,
+             theta_beta_ratio
+  - One row per 1-second step (centered on 2-second windows)
+  - Band power values in µV²/Hz; ratios are dimensionless
+
+WHAT CAN BE DEDUCED:
+  - Full numeric data for all bands and ratios over time
+  - Suitable for statistical analysis, correlation with task events, or
+    export to other tools
+  - Mean, std, and trends: Compute summary stats (e.g., mean Beta/Alpha during
+    task vs. rest) for quantitative comparisons
+  - Time-locked analysis: Align with task markers to study changes at specific
+    moments (e.g., stimulus onset, response)
+
+================================================================================
+4. STREAM RATIOS TEXT FILE (stream_ratios_<state>.txt)
+================================================================================
+
+WHAT IT CONTAINS:
+  - Pipeline state and input/output paths
+  - Reference channel stats: MV1 and MV3 variance (uV²) and peak-to-peak (uV)
+  - Re-referencing status: "applied" or "skipped" with reason if skipped
+  - Per-second Beta/Alpha and Theta/Beta ratios (same as in the CSV)
+  - Summary: mean, std, and last value for both ratios
+
+WHAT CAN BE DEDUCED:
+  - Reference quality: Low variance and pp indicate clean reference channels;
+    high values may explain why re-referencing was skipped.
+  - Quick ratio summary: Mean and std give an overview of engagement and
+    alertness for the recording.
+  - Human-readable log of processing and results for that task.
+
+================================================================================
+5. REFERENCE CHANNEL STATS (uV² and uV)
+================================================================================
+
+  MV1, MV3: Reference channels. The pipeline reports:
+    - var (variance, uV²): Variability of the reference. High = noisy.
+    - pp (peak-to-peak, uV): Max minus min voltage. High = large swings.
+
+  Thresholds (when quality check is on):
+    - var > 1000 uV²  → re-referencing skipped
+    - pp > 200 uV     → re-referencing skipped
+
+  Clean references typically have var in tens to low hundreds and pp < 100 µV.
+
+================================================================================
+UNITS QUICK REFERENCE
+================================================================================
+  µV (microvolt)      - Voltage; used for EEG amplitude, filtered signal, pp
+  µV²/Hz              - Power spectral density; used for band power (Delta,
+                        Theta, Alpha, Beta, Gamma)
+  uV² (microvolt²)    - Variance; used for reference channel variability
+  (ratio)             - Dimensionless; Beta/Alpha and Theta/Beta have no units
+
+================================================================================
+6. TYPICAL INTERPRETATIONS
+================================================================================
+
+  Beta/Alpha ratio:
+    < 1   → More alpha than beta; relaxed, idle, or eyes-closed
+    ≈ 1   → Balanced
+    > 1   → More beta than alpha; focused, alert, engaged
+
+  Theta/Beta ratio:
+    Higher → More theta relative to beta; drowsy, inattentive, or default state
+    Lower  → More beta relative to theta; alert, attentive, engaged
+
+  Band power (µV²/Hz):
+    - Delta (1-4 Hz): Often elevated in sleep or deep relaxation
+    - Theta (4-8 Hz): Drowsiness, meditation, or cognitive load in some tasks
+    - Alpha (8-13 Hz): Relaxed wakefulness, eyes closed; decreases with engagement
+    - Beta (13-30 Hz): Active thinking, focus, alertness
+    - Gamma (30-50 Hz): Higher-order processing; more variable and noisier
+
+  Best practice: Compare within the same person (task vs. rest, or different
+  tasks) rather than absolute values. Trends and condition differences are
+  more informative than single numbers.
+
+================================================================================
+CAVEATS AND LIMITATIONS
+================================================================================
+  - Single channel: Band power and ratios are computed from EEG channel 1
+    (MV2, or MV2-MV1 when re-referenced) only. EEG 2 (MV4) is plotted in the
+    filtered EEG graph but not used for band power. Results reflect activity
+    at one scalp location.
+  - Window size: 2-second sliding windows with 1-second step. Shorter windows
+    give poorer frequency resolution; longer windows smooth over rapid changes.
+  - Electrode placement: Interpretation depends on where MV2 and MV4 are
+    placed. Different scalp regions have different typical band profiles.
+  - Ratios are descriptive, not diagnostic: Beta/Alpha and Theta/Beta are
+    useful for comparing conditions but should not be used alone for clinical
+    or diagnostic conclusions.
+  - Artifacts: Movement, muscle, eye blinks, and loose electrodes can
+    contaminate band power. Inspect the filtered EEG graph for obvious
+    artifacts before trusting band-power or ratio values.
+
+================================================================================

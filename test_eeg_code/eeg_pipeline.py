@@ -38,10 +38,14 @@ PIPELINE_STATE_LABELS = {
 }
 
 
-def format_reference_report(quality_info, actual_referenced):
+def format_reference_report(quality_info, actual_referenced, referenced=None):
     """
     Build lines for reference channel stats (uV^2, uV) and re-referencing status.
     Returns list of strings for console or text file.
+
+    referenced: The pipeline's referenced parameter. When False, re-referencing
+        was explicitly disabled by user (--no-reference); when 'auto' or True
+        and actual_referenced is False, it was skipped due to quality check.
     """
     lines = []
     if not quality_info:
@@ -55,13 +59,16 @@ def format_reference_report(quality_info, actual_referenced):
     if actual_referenced:
         lines.append("Re-referencing: applied")
     else:
-        reasons = []
-        for ch in ("MV1", "MV3"):
-            info = quality_info.get(ch, {})
-            if not info.get("good", True):
-                reasons.append(f"{ch}: {info.get('reason', '?')}")
-        reason_str = "; ".join(reasons) if reasons else "quality check"
-        lines.append(f"Re-referencing: skipped ({reason_str})")
+        if referenced is False:
+            lines.append("Re-referencing: disabled (user choice)")
+        else:
+            reasons = []
+            for ch in ("MV1", "MV3"):
+                info = quality_info.get(ch, {})
+                if not info.get("good", True):
+                    reasons.append(f"{ch}: {info.get('reason', '?')}")
+            reason_str = "; ".join(reasons) if reasons else "quality check"
+            lines.append(f"Re-referencing: skipped ({reason_str})")
     return lines
 
 
@@ -287,7 +294,7 @@ def run_batch(output_dir=None, csv_path=None, referenced=True, auto_quality_chec
     t_uniform, eeg1_filt, eeg2_filt, fs, actual_referenced, quality_info = load_and_prepare(
         csv_path=csv_path, referenced=referenced, auto_quality_check=auto_quality_check
     )
-    for line in format_reference_report(quality_info, actual_referenced):
+    for line in format_reference_report(quality_info, actual_referenced, referenced=referenced):
         print(line)
 
     # Band power time series from channel 1 (MV2); add channel 2 if you want
@@ -373,7 +380,7 @@ def run_streaming_style(csv_path=None, out_dir=None, referenced=True, auto_quali
     t_uniform, eeg1_filt, eeg2_filt, fs, actual_referenced, quality_info = load_and_prepare(
         csv_path=csv_path, referenced=referenced, auto_quality_check=auto_quality_check, verbose=False
     )
-    ref_lines = format_reference_report(quality_info, actual_referenced)
+    ref_lines = format_reference_report(quality_info, actual_referenced, referenced=referenced)
     for line in ref_lines:
         print(line)
     lines.extend(ref_lines)
