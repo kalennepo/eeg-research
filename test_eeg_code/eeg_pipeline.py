@@ -1,5 +1,9 @@
 """
+<<<<<<< HEAD
 Combined EEG pipeline: band-power time series + Beta/Alpha ratio.
+=======
+Combined EEG pipeline: band-power time series + Beta/Alpha and Theta/Beta ratios.
+>>>>>>> Script-combo
 Uses the ALAS Muse recording: load → resample → filter → band powers → CSV + plots.
 """
 
@@ -38,6 +42,43 @@ PIPELINE_STATE_LABELS = {
 }
 
 
+<<<<<<< HEAD
+=======
+def format_reference_report(quality_info, actual_referenced, referenced=None):
+    """
+    Build lines for reference channel stats (uV^2, uV) and re-referencing status.
+    Returns list of strings for console or text file.
+
+    referenced: The pipeline's referenced parameter. When False, re-referencing
+        was explicitly disabled by user (--no-reference); when 'auto' or True
+        and actual_referenced is False, it was skipped due to quality check.
+    """
+    lines = []
+    if not quality_info:
+        return lines
+    for ch in ("MV1", "MV3"):
+        info = quality_info.get(ch, {})
+        var = info.get("var")
+        pp = info.get("pp")
+        if var is not None and pp is not None:
+            lines.append(f"  {ch}: var={var:.1f} uV^2, pp={pp:.1f} uV")
+    if actual_referenced:
+        lines.append("Re-referencing: applied")
+    else:
+        if referenced is False:
+            lines.append("Re-referencing: disabled (user choice)")
+        else:
+            reasons = []
+            for ch in ("MV1", "MV3"):
+                info = quality_info.get(ch, {})
+                if not info.get("good", True):
+                    reasons.append(f"{ch}: {info.get('reason', '?')}")
+            reason_str = "; ".join(reasons) if reasons else "quality check"
+            lines.append(f"Re-referencing: skipped ({reason_str})")
+    return lines
+
+
+>>>>>>> Script-combo
 def get_project_root():
     """Project root (parent of test_eeg_code)."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -93,14 +134,24 @@ def check_reference_quality(mv_ref, mv_meas, variance_threshold=REF_VARIANCE_THR
                             amplitude_threshold=REF_AMPLITUDE_THRESHOLD, snr_threshold=REF_SNR_THRESHOLD):
     """
     Check if reference channels (MV1/MV3) are suitable for re-referencing.
+<<<<<<< HEAD
     
     Returns: (is_good, reason)
         is_good: True if reference is clean enough to use
         reason: string explaining why it passed/failed
+=======
+
+    Returns: (is_good, reason, ref_var, ref_pp)
+        is_good: True if reference is clean enough to use
+        reason: string explaining why it passed/failed
+        ref_var: reference variance (uV^2)
+        ref_pp: reference peak-to-peak amplitude (uV)
+>>>>>>> Script-combo
     """
     ref_var = np.var(mv_ref)
     ref_pp = np.ptp(mv_ref)  # peak-to-peak amplitude
     meas_var = np.var(mv_meas)
+<<<<<<< HEAD
     
     # Check variance threshold
     if ref_var > variance_threshold:
@@ -115,6 +166,22 @@ def check_reference_quality(mv_ref, mv_meas, variance_threshold=REF_VARIANCE_THR
         return False, f"reference too noisy relative to measurement (SNR ratio {ref_var/meas_var:.3f} > {snr_threshold:.3f})"
     
     return True, f"reference quality OK (var={ref_var:.1f} uV², pp={ref_pp:.1f} uV)"
+=======
+
+    # Check variance threshold
+    if ref_var > variance_threshold:
+        return False, f"reference variance too high ({ref_var:.1f} > {variance_threshold:.1f} uV^2)", ref_var, ref_pp
+
+    # Check amplitude threshold
+    if ref_pp > amplitude_threshold:
+        return False, f"reference amplitude too high ({ref_pp:.1f} > {amplitude_threshold:.1f} uV)", ref_var, ref_pp
+
+    # Check SNR: if reference is much noisier than measurement, skip
+    if meas_var > 0 and ref_var / meas_var > snr_threshold:
+        return False, f"reference too noisy relative to measurement (SNR ratio {ref_var/meas_var:.3f} > {snr_threshold:.3f})", ref_var, ref_pp
+
+    return True, f"reference quality OK (var={ref_var:.1f} uV^2, pp={ref_pp:.1f} uV)", ref_var, ref_pp
+>>>>>>> Script-combo
 
 
 def load_and_prepare(csv_path=None, referenced=True, auto_quality_check=True, verbose=True):
@@ -157,6 +224,7 @@ def load_and_prepare(csv_path=None, referenced=True, auto_quality_check=True, ve
     actual_referenced = False
     quality_info = {}
     
+<<<<<<< HEAD
     if referenced == 'auto':
         # Auto mode: check quality if enabled, otherwise default to re-referencing
         if auto_quality_check:
@@ -169,6 +237,19 @@ def load_and_prepare(csv_path=None, referenced=True, auto_quality_check=True, ve
                 'MV3': {'good': ref2_good, 'reason': ref2_reason}
             }
             
+=======
+    # Always compute reference stats (uV², uV) for reporting
+    ref1_good, ref1_reason, ref1_var, ref1_pp = check_reference_quality(mv1, mv2)
+    ref2_good, ref2_reason, ref2_var, ref2_pp = check_reference_quality(mv3, mv4)
+    quality_info = {
+        'MV1': {'good': ref1_good, 'reason': ref1_reason, 'var': ref1_var, 'pp': ref1_pp},
+        'MV3': {'good': ref2_good, 'reason': ref2_reason, 'var': ref2_var, 'pp': ref2_pp}
+    }
+
+    if referenced == 'auto':
+        # Auto mode: check quality if enabled, otherwise default to re-referencing
+        if auto_quality_check:
+>>>>>>> Script-combo
             # Only re-reference if both references are good
             if ref1_good and ref2_good:
                 actual_referenced = True
@@ -215,8 +296,13 @@ def load_and_prepare(csv_path=None, referenced=True, auto_quality_check=True, ve
 
 def compute_band_power_timeseries(eeg_filt, fs=FS, bands=BANDS, window_sec=WINDOW_SEC, step_sec=STEP_SEC):
     """
+<<<<<<< HEAD
     Sliding-window band power and Beta/Alpha ratio over time.
     Returns: DataFrame with time_sec, Delta, Theta, Alpha, Beta, Gamma, beta_alpha_ratio.
+=======
+    Sliding-window band power and Beta/Alpha + Theta/Beta ratios over time.
+    Returns: DataFrame with time_sec, Delta, Theta, Alpha, Beta, Gamma, beta_alpha_ratio, theta_beta_ratio.
+>>>>>>> Script-combo
     """
     win = int(window_sec * fs)
     step = int(step_sec * fs)
@@ -232,10 +318,20 @@ def compute_band_power_timeseries(eeg_filt, fs=FS, bands=BANDS, window_sec=WINDO
             p = np.mean(psd[(freqs >= lo) & (freqs <= hi)])
             band_power[name] = p
             row[name] = p
+<<<<<<< HEAD
         # Beta/Alpha ratio (from fft_algorithim.py)
         alpha = band_power["Alpha"]
         beta = band_power["Beta"]
         row["beta_alpha_ratio"] = beta / alpha if alpha > 0 else np.nan
+=======
+        # Beta/Alpha ratio: engagement vs. relaxation (higher = more focused/alert)
+        alpha = band_power["Alpha"]
+        beta = band_power["Beta"]
+        row["beta_alpha_ratio"] = beta / alpha if alpha > 0 else np.nan
+        # Theta/Beta ratio: alertness/attention (higher = more drowsy/inattentive)
+        theta = band_power["Theta"]
+        row["theta_beta_ratio"] = theta / beta if beta > 0 else np.nan
+>>>>>>> Script-combo
         rows.append(row)
 
     return pd.DataFrame(rows)
@@ -256,6 +352,11 @@ def run_batch(output_dir=None, csv_path=None, referenced=True, auto_quality_chec
     t_uniform, eeg1_filt, eeg2_filt, fs, actual_referenced, quality_info = load_and_prepare(
         csv_path=csv_path, referenced=referenced, auto_quality_check=auto_quality_check
     )
+<<<<<<< HEAD
+=======
+    for line in format_reference_report(quality_info, actual_referenced, referenced=referenced):
+        print(line)
+>>>>>>> Script-combo
 
     # Band power time series from channel 1 (MV2); add channel 2 if you want
     band_df = compute_band_power_timeseries(eeg1_filt, fs=fs)
@@ -279,6 +380,7 @@ def run_batch(output_dir=None, csv_path=None, referenced=True, auto_quality_chec
     fig.savefig(os.path.join(output_dir, f"filtered_eeg{suffix}.png"), dpi=150)
     plt.close(fig)
 
+<<<<<<< HEAD
     # Band power + Beta/Alpha ratio plots
     fig, axes = plt.subplots(6, 1, figsize=(12, 9), sharex=True)
     for ax, name in zip(axes, list(BANDS) + ["Beta/Alpha ratio"]):
@@ -299,11 +401,51 @@ def run_batch(output_dir=None, csv_path=None, referenced=True, auto_quality_chec
     ratio = band_df["beta_alpha_ratio"].dropna()
     print(f"Saved: {csv_name}, filtered_eeg{suffix}.png, band_power{suffix}.png")
     print(f"Beta/Alpha ratio: mean={ratio.mean():.2f}, std={ratio.std():.2f}, last={band_df['beta_alpha_ratio'].iloc[-1]:.2f}")
+=======
+    # Band power + ratio plots (Beta/Alpha and Theta/Beta with purpose labels)
+    fig, axes = plt.subplots(7, 1, figsize=(12, 10), sharex=True)
+    ratio_names = ["Beta/Alpha ratio", "Theta/Beta ratio"]
+    ratio_cols = ["beta_alpha_ratio", "theta_beta_ratio"]
+    ratio_labels = [
+        "Engagement vs. relaxation (higher = more focused/alert)",
+        "Alertness/attention (higher = more drowsy/inattentive)",
+    ]
+    ratio_colors = ["C5", "C6"]
+    ratio_box_colors = ["wheat", "lightblue"]
+    for ax, name in zip(axes, list(BANDS) + ratio_names):
+        if name in ratio_names:
+            idx = ratio_names.index(name)
+            a = axes[5 + idx]
+            a.plot(band_df["time_sec"], band_df[ratio_cols[idx]], color=ratio_colors[idx], label=name)
+            a.set_ylabel(f"{name.replace(' ratio', '')}\n(ratio)")
+            a.text(0.02, 0.95, ratio_labels[idx],
+                   transform=a.transAxes, fontsize=8, verticalalignment="top",
+                   bbox=dict(boxstyle="round", facecolor=ratio_box_colors[idx], alpha=0.5))
+            if idx == 0:
+                a.axhline(y=1, color="gray", linestyle="--", alpha=0.7)
+        else:
+            ax.plot(band_df["time_sec"], band_df[name])
+            ax.set_ylabel(f"{name}\n(µV²/Hz)")
+    axes[-1].set_xlabel("Time (sec)")
+    axes[0].set_title(f"Band Power and Ratios — {PIPELINE_STATE_LABELS.get(pipeline_state, pipeline_state)}")
+    fig.tight_layout()
+    fig.subplots_adjust(left=0.12)  # Room for y-axis labels with units
+    fig.savefig(os.path.join(output_dir, f"band_power{suffix}.png"), dpi=150)
+    plt.close(fig)
+
+    # Summary stats for ratios (like streaming output, but from full run)
+    beta_alpha = band_df["beta_alpha_ratio"].dropna()
+    theta_beta = band_df["theta_beta_ratio"].dropna()
+    print(f"Saved: {csv_name}, filtered_eeg{suffix}.png, band_power{suffix}.png")
+    print(f"Beta/Alpha ratio: mean={beta_alpha.mean():.2f}, std={beta_alpha.std():.2f}, last={band_df['beta_alpha_ratio'].iloc[-1]:.2f}")
+    print(f"Theta/Beta ratio: mean={theta_beta.mean():.2f}, std={theta_beta.std():.2f}, last={band_df['theta_beta_ratio'].iloc[-1]:.2f}")
+>>>>>>> Script-combo
     return band_df
 
 
 def run_streaming_style(csv_path=None, out_dir=None, referenced=True, auto_quality_check=True, pipeline_state=None):
     """
+<<<<<<< HEAD
     Simulate streaming: step through the same pipeline in 1 s steps and print
     Beta/Alpha ratio each second (no real I/O, uses precomputed data).
     """
@@ -331,17 +473,84 @@ def run_streaming_style(csv_path=None, out_dir=None, referenced=True, auto_quali
         f.write(f"# pipeline_state={pipeline_state}\n")
     band_df.to_csv(path, mode="a", index=False)
     print(f"Saved band_power_timeseries{suffix}.csv to {out_dir}")
+=======
+    Simulate streaming: step through the same pipeline in 1 s steps and write
+    Beta/Alpha and Theta/Beta ratios each second to a text file in the task
+    results folder (no console output).
+    """
+    csv_path = csv_path or get_data_path()
+    out_dir = out_dir or get_output_dir_for_csv(csv_path)
+    os.makedirs(out_dir, exist_ok=True)
+
+    pipeline_state = pipeline_state or PIPELINE_STATE_DEFAULT
+    print(f"Pipeline state: {PIPELINE_STATE_LABELS.get(pipeline_state, pipeline_state)}")
+    lines = [
+        f"Pipeline state: {PIPELINE_STATE_LABELS.get(pipeline_state, pipeline_state)}",
+        f"Input: {csv_path}",
+        f"Output dir: {out_dir}",
+    ]
+
+    t_uniform, eeg1_filt, eeg2_filt, fs, actual_referenced, quality_info = load_and_prepare(
+        csv_path=csv_path, referenced=referenced, auto_quality_check=auto_quality_check, verbose=False
+    )
+    ref_lines = format_reference_report(quality_info, actual_referenced, referenced=referenced)
+    for line in ref_lines:
+        print(line)
+    lines.extend(ref_lines)
+    lines.append("")
+    lines.append("Streaming-style ratios (every 1 s):")
+
+    band_df = compute_band_power_timeseries(eeg1_filt, fs=fs)
+
+    for _, row in band_df.iterrows():
+        ba = row["beta_alpha_ratio"]
+        tb = row["theta_beta_ratio"]
+        line = f"  t={row['time_sec']:.1f}s  Beta/Alpha = {ba:.2f}, Theta/Beta = {tb:.2f}"
+        lines.append(line)
+
+    # Summary stats for ratios (match batch-mode summary)
+    beta_alpha = band_df["beta_alpha_ratio"].dropna()
+    theta_beta = band_df["theta_beta_ratio"].dropna()
+    summary_lines = [
+        f"Beta/Alpha ratio: mean={beta_alpha.mean():.2f}, std={beta_alpha.std():.2f}, last={band_df['beta_alpha_ratio'].iloc[-1]:.2f}",
+        f"Theta/Beta ratio: mean={theta_beta.mean():.2f}, std={theta_beta.std():.2f}, last={band_df['theta_beta_ratio'].iloc[-1]:.2f}",
+    ]
+    # Print summary to console
+    for s in summary_lines:
+        print(s)
+    # And append to text output
+    lines.append("")
+    lines.extend(summary_lines)
+
+    suffix = f"_{pipeline_state}"
+    txt_path = os.path.join(out_dir, f"stream_ratios{suffix}.txt")
+    with open(txt_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+    csv_path_out = os.path.join(out_dir, f"band_power_timeseries{suffix}.csv")
+    with open(csv_path_out, "w") as f:
+        f.write(f"# pipeline_state={pipeline_state}\n")
+    band_df.to_csv(csv_path_out, mode="a", index=False)
+>>>>>>> Script-combo
     return band_df
 
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     parser = argparse.ArgumentParser(description="EEG pipeline: band power time series + Beta/Alpha ratio")
+=======
+    parser = argparse.ArgumentParser(description="EEG pipeline: band power time series + Beta/Alpha and Theta/Beta ratios")
+>>>>>>> Script-combo
     parser.add_argument("--stream", action="store_true", help="Print Beta/Alpha ratio every 1 s (streaming-style)")
     parser.add_argument("--recording", default=None, help="P01 recording id: Task01, Task02, Task03, or Task04 (default: Task01)")
     parser.add_argument("--input", default=None, help="Path to input CSV (overrides --recording)")
     parser.add_argument("--out", default=None, help="Output directory (default: P01Results/<TaskNN>/)")
     parser.add_argument("--no-reference", action="store_true", help="Use raw MV2/MV4 only; do not re-reference with MV1/MV3")
+<<<<<<< HEAD
     parser.add_argument("--force-reference", "--forced-reference", dest="force_reference", action="store_true", help="Always re-reference (ignore quality checks)")
+=======
+    parser.add_argument("--force-reference", action="store_true", help="Always re-reference (ignore quality checks)")
+>>>>>>> Script-combo
     parser.add_argument("--no-quality-check", action="store_true", help="Disable automatic quality checking (use with --force-reference)")
     args = parser.parse_args()
 
