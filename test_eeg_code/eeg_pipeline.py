@@ -145,17 +145,17 @@ def check_reference_quality(mv_ref, mv_meas, variance_threshold=REF_VARIANCE_THR
     
     # Check variance threshold
     if ref_var > variance_threshold:
-        return False, f"reference variance too high ({ref_var:.1f} > {variance_threshold:.1f} uV²)"
-    
+        return False, f"reference variance too high ({ref_var:.1f} > {variance_threshold:.1f} uV²)", ref_var, ref_pp
+
     # Check amplitude threshold
     if ref_pp > amplitude_threshold:
-        return False, f"reference amplitude too high ({ref_pp:.1f} > {amplitude_threshold:.1f} uV)"
-    
+        return False, f"reference amplitude too high ({ref_pp:.1f} > {amplitude_threshold:.1f} uV)", ref_var, ref_pp
+
     # Check SNR: if reference is much noisier than measurement, skip
     if meas_var > 0 and ref_var / meas_var > snr_threshold:
-        return False, f"reference too noisy relative to measurement (SNR ratio {ref_var/meas_var:.3f} > {snr_threshold:.3f})"
-    
-    return True, f"reference quality OK (var={ref_var:.1f} uV², pp={ref_pp:.1f} uV)"
+        return False, f"reference too noisy relative to measurement (SNR ratio {ref_var/meas_var:.3f} > {snr_threshold:.3f})", ref_var, ref_pp
+
+    return True, f"reference quality OK (var={ref_var:.1f} uV², pp={ref_pp:.1f} uV)", ref_var, ref_pp
 
 
 def load_and_prepare(csv_path=None, referenced=True, auto_quality_check=True, verbose=True):
@@ -196,21 +196,8 @@ def load_and_prepare(csv_path=None, referenced=True, auto_quality_check=True, ve
 
     # Determine if we should re-reference
     actual_referenced = False
-    quality_info = {}
-    
-    if referenced == 'auto':
-        # Auto mode: check quality if enabled, otherwise default to re-referencing
-        if auto_quality_check:
-            # Check quality of both reference pairs
-            ref1_good, ref1_reason = check_reference_quality(mv1, mv2)
-            ref2_good, ref2_reason = check_reference_quality(mv3, mv4)
-            
-            quality_info = {
-                'MV1': {'good': ref1_good, 'reason': ref1_reason},
-                'MV3': {'good': ref2_good, 'reason': ref2_reason}
-            }
-            
-    # Always compute reference stats (uV², uV) for reporting
+
+    # Always compute reference stats (uV², uV) for reporting and quality decisions
     ref1_good, ref1_reason, ref1_var, ref1_pp = check_reference_quality(mv1, mv2)
     ref2_good, ref2_reason, ref2_var, ref2_pp = check_reference_quality(mv3, mv4)
     quality_info = {
