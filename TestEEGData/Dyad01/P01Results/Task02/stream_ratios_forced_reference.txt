@@ -69,5 +69,10 @@ Streaming-style ratios (every 1 s):
   t=61.0s  Beta/Alpha = 0.16, Theta/Beta = 14.63
   t=62.0s  Beta/Alpha = 0.15, Theta/Beta = 14.11
 
+MV1 reference variance (uV^2): mean=0.09, std=0.05, min=0.02 @ 54.0s, max=0.24 @ 56.0s, median=0.07, p95=0.17
+MV1 reference variance windows: n=62 (2s windows, 1s step)
+MV3 reference variance (uV^2): mean=0.09, std=0.06, min=0.02 @ 16.0s, max=0.25 @ 26.0s, median=0.07, p95=0.20
+MV3 reference variance windows: n=62 (2s windows, 1s step)
+
 Beta/Alpha ratio: mean=0.15, std=0.10, last=0.15
 Theta/Beta ratio: mean=10.71, std=4.25, last=14.11

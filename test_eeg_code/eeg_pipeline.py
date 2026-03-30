@@ -173,7 +173,7 @@ def load_and_prepare(csv_path=None, referenced=True, auto_quality_check=True, ve
         auto_quality_check: If True and referenced='auto', check reference quality before re-referencing
         verbose: Print quality check results
 
-    Returns: t_uniform, eeg1_filt, eeg2_filt, fs, (actual_referenced, quality_info)
+    Returns: t_uniform, eeg1_filt, eeg2_filt, fs, mv1, mv3, (actual_referenced, quality_info)
         actual_referenced: Whether re-referencing was actually applied
         quality_info: Dict with quality check results for both channels
     """
@@ -249,7 +249,9 @@ def load_and_prepare(csv_path=None, referenced=True, auto_quality_check=True, ve
     eeg1_filt = signal.filtfilt(b, a, eeg1)
     eeg2_filt = signal.filtfilt(b, a, eeg2)
 
-    return t_uniform, eeg1_filt, eeg2_filt, FS, actual_referenced, quality_info
+    # Return the resampled raw reference traces (MV1, MV3) as well so we can
+    # compute windowed reference variance time series.
+    return t_uniform, eeg1_filt, eeg2_filt, FS, mv1, mv3, actual_referenced, quality_info
 
 
 def compute_band_power_timeseries(eeg_filt, fs=FS, bands=BANDS, window_sec=WINDOW_SEC, step_sec=STEP_SEC):
@@ -283,6 +285,35 @@ def compute_band_power_timeseries(eeg_filt, fs=FS, bands=BANDS, window_sec=WINDO
     return pd.DataFrame(rows)
 
 
+def compute_reference_variance_timeseries(mv1, mv3, fs=FS, window_sec=WINDOW_SEC, step_sec=STEP_SEC):
+    """
+    Compute reference-channel variance in sliding windows.
+
+    Uses the same windowing convention as band-power:
+      - window_sec: window length in seconds
+      - step_sec: hop length in seconds
+      - time_sec: center time of each window
+
+    Returns: DataFrame with time_sec, MV1_var (uV^2), MV3_var (uV^2).
+    """
+    win = int(window_sec * fs)
+    step = int(step_sec * fs)
+
+    rows = []
+    n_windows = (len(mv1) - win) // step
+    for i in range(n_windows):
+        seg1 = mv1[i * step : i * step + win]
+        seg3 = mv3[i * step : i * step + win]
+        row = {
+            "time_sec": (i * step + win / 2) / fs,
+            "MV1_var": float(np.var(seg1)),
+            "MV3_var": float(np.var(seg3)),
+        }
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
 def run_batch(output_dir=None, csv_path=None, referenced=True, auto_quality_check=True, pipeline_state=None):
     """Full offline pipeline: load, filter, band power + ratio, save CSV and plots."""
     csv_path = csv_path or get_data_path()
@@ -295,7 +326,7 @@ def run_batch(output_dir=None, csv_path=None, referenced=True, auto_quality_chec
     print(f"Input: {csv_path}")
     print(f"Output dir: {output_dir}")
 
-    t_uniform, eeg1_filt, eeg2_filt, fs, actual_referenced, quality_info = load_and_prepare(
+    t_uniform, eeg1_filt, eeg2_filt, fs, mv1_resampled, mv3_resampled, actual_referenced, quality_info = load_and_prepare(
         csv_path=csv_path, referenced=referenced, auto_quality_check=auto_quality_check
     )
     for line in format_reference_report(quality_info, actual_referenced, referenced=referenced):
@@ -303,6 +334,26 @@ def run_batch(output_dir=None, csv_path=None, referenced=True, auto_quality_chec
 
     # Band power time series from channel 1 (MV2); add channel 2 if you want
     band_df = compute_band_power_timeseries(eeg1_filt, fs=fs)
+
+    # Reference variance time series (windowed uV^2)
+    ref_var_df = compute_reference_variance_timeseries(mv1_resampled, mv3_resampled, fs=fs)
+    ref_var_csv_name = f"ref_variance_timeseries{suffix}.csv"
+    ref_var_csv_path = os.path.join(output_dir, ref_var_csv_name)
+    with open(ref_var_csv_path, "w") as f:
+        f.write(f"# pipeline_state={pipeline_state}\n")
+    ref_var_df.to_csv(ref_var_csv_path, mode="a", index=False)
+
+    # Plot reference variance (batch mode)
+    fig, ax = plt.subplots(figsize=(12, 4))
+    ax.plot(ref_var_df["time_sec"], ref_var_df["MV1_var"], label="MV1 variance", color="C2")
+    ax.plot(ref_var_df["time_sec"], ref_var_df["MV3_var"], label="MV3 variance", color="C3")
+    ax.set_xlabel("Time (sec)")
+    ax.set_ylabel("Reference variance (uV^2)")
+    ax.set_title(f"Reference variance time series — {PIPELINE_STATE_LABELS.get(pipeline_state, pipeline_state)}")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(output_dir, f"reference_variance{suffix}.png"), dpi=150)
+    plt.close(fig)
     csv_name = f"band_power_timeseries{suffix}.csv"
     csv_path = os.path.join(output_dir, csv_name)
     # Write pipeline state as first comment line so output is self-describing
@@ -381,8 +432,11 @@ def run_streaming_style(csv_path=None, out_dir=None, referenced=True, auto_quali
         f"Output dir: {out_dir}",
     ]
 
-    t_uniform, eeg1_filt, eeg2_filt, fs, actual_referenced, quality_info = load_and_prepare(
-        csv_path=csv_path, referenced=referenced, auto_quality_check=auto_quality_check, verbose=False
+    t_uniform, eeg1_filt, eeg2_filt, fs, mv1_resampled, mv3_resampled, actual_referenced, quality_info = load_and_prepare(
+        csv_path=csv_path,
+        referenced=referenced,
+        auto_quality_check=auto_quality_check,
+        verbose=False,
     )
     ref_lines = format_reference_report(quality_info, actual_referenced, referenced=referenced)
     for line in ref_lines:
@@ -393,11 +447,44 @@ def run_streaming_style(csv_path=None, out_dir=None, referenced=True, auto_quali
 
     band_df = compute_band_power_timeseries(eeg1_filt, fs=fs)
 
+    # Reference variance time series (windowed uV^2)
+    ref_var_df = compute_reference_variance_timeseries(mv1_resampled, mv3_resampled, fs=fs)
+    suffix = f"_{pipeline_state}"
+    ref_var_csv_path = os.path.join(out_dir, f"ref_variance_timeseries{suffix}.csv")
+    with open(ref_var_csv_path, "w") as f:
+        f.write(f"# pipeline_state={pipeline_state}\n")
+    ref_var_df.to_csv(ref_var_csv_path, mode="a", index=False)
+
     for _, row in band_df.iterrows():
         ba = row["beta_alpha_ratio"]
         tb = row["theta_beta_ratio"]
         line = f"  t={row['time_sec']:.1f}s  Beta/Alpha = {ba:.2f}, Theta/Beta = {tb:.2f}"
         lines.append(line)
+
+    # Reference variance summary across the whole recording
+    # (computed from the same 2s/1s sliding windows used to create ref_var_df)
+    variance_summary_lines = []
+    if not ref_var_df.empty:
+        for col, label in (("MV1_var", "MV1"), ("MV3_var", "MV3")):
+            s = ref_var_df[col].dropna()
+            if s.empty:
+                continue
+            min_v = float(s.min())
+            max_v = float(s.max())
+            mean_v = float(s.mean())
+            std_v = float(s.std())
+            median_v = float(s.median())
+            p95_v = float(np.percentile(s.values, 95))
+            max_idx = int(s.idxmax())
+            max_t = float(ref_var_df.loc[max_idx, "time_sec"])
+            min_idx = int(s.idxmin())
+            min_t = float(ref_var_df.loc[min_idx, "time_sec"])
+            variance_summary_lines.extend([
+                f"{label} reference variance (uV^2): mean={mean_v:.2f}, std={std_v:.2f}, "
+                f"min={min_v:.2f} @ {min_t:.1f}s, max={max_v:.2f} @ {max_t:.1f}s, "
+                f"median={median_v:.2f}, p95={p95_v:.2f}",
+                f"{label} reference variance windows: n={len(s)} (2s windows, 1s step)",
+            ])
 
     # Summary stats for ratios (match batch-mode summary)
     beta_alpha = band_df["beta_alpha_ratio"].dropna()
@@ -411,9 +498,10 @@ def run_streaming_style(csv_path=None, out_dir=None, referenced=True, auto_quali
         print(s)
     # And append to text output
     lines.append("")
+    lines.extend(variance_summary_lines)
+    lines.append("")
     lines.extend(summary_lines)
 
-    suffix = f"_{pipeline_state}"
     txt_path = os.path.join(out_dir, f"stream_ratios{suffix}.txt")
     with open(txt_path, "w") as f:
         f.write("\n".join(lines) + "\n")
